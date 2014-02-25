@@ -45,32 +45,35 @@ int main(int argc, char* argv[]){
     }
 
     /* Loop Through Input Files */
-    for(i=1; i<(argc-1); i++){
-	
-	/* Open Input File */
-	inputfp = fopen(argv[i], "r");
-	if(!inputfp){
-	    sprintf(errorstr, "Error Opening Input File: %s", argv[i]);
-	    perror(errorstr);
-	    break;
-	}	
+    for(i=1; i<(argc-1); i++)
+    {
+		
+		/* Open Input File */
+		inputfp = fopen(argv[i], "r");
+		if(!inputfp)
+		{
+		    sprintf(errorstr, "Error Opening Input File: %s", argv[i]);
+		    perror(errorstr);
+		    break;
+		}	
 
-	/* Read File and Process*/
-	while(fscanf(inputfp, INPUTFS, hostname) > 0){
-	
-	    /* Lookup hostname and get IP string */
-	    if(dnslookup(hostname, firstipstr, sizeof(firstipstr))
-	       == UTIL_FAILURE){
-		fprintf(stderr, "dnslookup error: %s\n", hostname);
-		strncpy(firstipstr, "", sizeof(firstipstr));
-	    }
-	
-	    /* Write to Output File */
-	    fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
-	}
+		/* Read File and Process*/
+		while(fscanf(inputfp, INPUTFS, hostname) > 0)
+		{
+		
+		    /* Lookup hostname and get IP string */
+		    if(dnslookup(hostname, firstipstr, sizeof(firstipstr)) == UTIL_FAILURE)
+		    {
+				fprintf(stderr, "dnslookup error: %s\n", hostname);
+				strncpy(firstipstr, "", sizeof(firstipstr));
+		    }
+		
+		    /* Write to Output File */
+		    fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
+		}
 
-	/* Close Input File */
-	fclose(inputfp);
+		/* Close Input File */
+		fclose(inputfp);
     }
 
     /* Close Output File */
