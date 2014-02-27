@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -c -g -Wall -Wextra
-LFLAGS = -Wall -Wextra -pthread
+LFLAGS = -g -Wall -Wextra -pthread
 
 .PHONY: all clean
 

@@ -34,10 +34,31 @@ Some basic notes:
 
 
 
-		
+
 void* handleFile(FILE* inputFile)
 {
+
+	char hostname[SBUFSIZE];	//Holds the individual hostname
+	char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
+
+	/* Read File and Process*/
+	printf("Not in loop yet\n");
+	while(fscanf(inputFile, INPUTFS, hostname) > 0)
+	{
+		printf("%s\n", hostname);
+	    /* Lookup hostname and get IP string */
+	    if(dnslookup(hostname, firstipstr, sizeof(firstipstr)) == UTIL_FAILURE)
+	    {
+			fprintf(stderr, "dnslookup error: %s\n", hostname);
+			strncpy(firstipstr, "", sizeof(firstipstr));
+	    }
 	
+	    /* Write to Output File */
+	    // fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
+	    printf("%s,%s\n", hostname, firstipstr);
+	}
+	/* Close Input File */
+	fclose(inputFile);
 }
 
 int main(int argc, char* argv[])
@@ -46,6 +67,12 @@ int main(int argc, char* argv[])
     /* Local Vars */
     FILE* inputfp = NULL;		//Holds the input file
     FILE* outputfp = NULL;		//Holds the output file
+    pthread_t threads[argc-1];
+
+    FILE* inputFiles[argc-1];
+
+
+
     char hostname[SBUFSIZE];	//Holds the individual hostname
     char errorstr[SBUFSIZE];	//Holds some error text
     char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
@@ -70,33 +97,25 @@ int main(int argc, char* argv[])
     /* Loop Through Input Files */
     for(i=1; i<(argc-1); i++)	//Allocate 1 thread for every iteration here
     {
-		
+    	// printf("In main loop\n");
 		/* Open Input File */
-		inputfp = fopen(argv[i], "r");
-		if(!inputfp)
+		inputFiles[i-1] = fopen(argv[i], "r");
+		if(!inputFiles[i-1])
 		{
 		    sprintf(errorstr, "Error Opening Input File: %s", argv[i]);
 		    perror(errorstr);
-		    break;
+		    // break;
 		}	
 
-		/* Read File and Process*/
-		while(fscanf(inputfp, INPUTFS, hostname) > 0)
-		{
+		int rc = pthread_create(&(threads[i-1]), NULL, handleFile, inputFiles[i-1]);
+		// printf("%i\n", rc );
 		
-		    /* Lookup hostname and get IP string */
-		    if(dnslookup(hostname, firstipstr, sizeof(firstipstr)) == UTIL_FAILURE)
-		    {
-				fprintf(stderr, "dnslookup error: %s\n", hostname);
-				strncpy(firstipstr, "", sizeof(firstipstr));
-		    }
-		
-		    /* Write to Output File */
-		    fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
-		}
+    }
 
-		/* Close Input File */
-		fclose(inputfp);
+    for(int j = 1; j < argc-1; ++j)
+    {
+    	int rc = pthread_join(threads[i-1], NULL);
+    	printf("Thread %i finished. rc = %i\n", j-1, rc);
     }
 
     /* Close Output File */

@@ -47,12 +47,20 @@ int main(int argc, char *argv[])
     int rc;
     long t;
     long cpyt[NUM_THREADS];
+
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+
+
+
     
     /* Spawn NUM_THREADS threads */
     for(t=0;t<NUM_THREADS;t++){
     	printf("In main: creating thread %ld\n", t);
     	cpyt[t] = t;
-    	rc = pthread_create(&(threads[t]), NULL, PrintHello, &(cpyt[t]));
+    	rc = pthread_create(&(threads[t]), &attr, PrintHello, &(cpyt[t]));
     	if (rc)
         {
     	    printf("ERROR; return code from pthread_create() is %d\n", rc);
@@ -63,7 +71,7 @@ int main(int argc, char *argv[])
     /* Wait for All Theads to Finish */
     for(t=0;t<NUM_THREADS;t++)
     {
-    	pthread_join(threads[t],NULL);
+    	pthread_join(threads[t], NULL);
     }
     printf("All of the threads were completed!\n");
     
