@@ -50,18 +50,20 @@ int main(int argc, char *argv[])
     
     /* Spawn NUM_THREADS threads */
     for(t=0;t<NUM_THREADS;t++){
-	printf("In main: creating thread %ld\n", t);
-	cpyt[t] = t;
-	rc = pthread_create(&(threads[t]), NULL, PrintHello, &(cpyt[t]));
-	if (rc){
-	    printf("ERROR; return code from pthread_create() is %d\n", rc);
-	    exit(EXIT_FAILURE);
-	}
+    	printf("In main: creating thread %ld\n", t);
+    	cpyt[t] = t;
+    	rc = pthread_create(&(threads[t]), NULL, PrintHello, &(cpyt[t]));
+    	if (rc)
+        {
+    	    printf("ERROR; return code from pthread_create() is %d\n", rc);
+    	    exit(EXIT_FAILURE);
+    	}
     }
     
     /* Wait for All Theads to Finish */
-    for(t=0;t<NUM_THREADS;t++){
-	pthread_join(threads[t],NULL);
+    for(t=0;t<NUM_THREADS;t++)
+    {
+    	pthread_join(threads[t],NULL);
     }
     printf("All of the threads were completed!\n");
     
