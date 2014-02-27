@@ -24,6 +24,7 @@ Some basic notes:
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "util.h"
 
@@ -78,6 +79,11 @@ int main(int argc, char* argv[])
     char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
     int i;	//Index variable for iterating through argv
     
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+
     /* Check Arguments */
     if(argc < MINARGS)
     {
@@ -107,7 +113,7 @@ int main(int argc, char* argv[])
 		    // break;
 		}	
 
-		int rc = pthread_create(&(threads[i-1]), NULL, handleFile, inputFiles[i-1]);
+		int rc = pthread_create(&(threads[i-1]), &attr, handleFile, inputFiles[i-1]);
 		// printf("%i\n", rc );
 		
     }
