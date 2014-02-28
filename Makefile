@@ -21,7 +21,6 @@ pthread-hello: pthread-hello.o
 lookup.o: lookup.c
 	$(CC) $(CFLAGS) $<
 
-
 multi-lookup.o: multi-lookup.c
 	$(CC) $(CFLAGS) $<
 
@@ -36,7 +35,6 @@ util.o: util.c util.h
 
 pthread-hello.o: pthread-hello.c
 	$(CC) $(CFLAGS) $<
-
 
 clean:
 	rm -f lookup queueTest pthread-hello multi-lookup

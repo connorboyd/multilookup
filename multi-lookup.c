@@ -7,9 +7,7 @@
  * 	This file contains threaded lookup program
  *  
  */
-
 /*
-
 Some basic notes:
 	Allocate one request thread for each input file
 	Request threads should add hostnames to the request queue
@@ -17,7 +15,6 @@ Some basic notes:
 		Queue needs a mutex
 	Resolver thread should take a hostname from the queue, resolve the IP address, and write the results to results.txt
 		At least 2 resolver threads (Match to # of cores? More?)
-
 */
 
 #include <stdlib.h>
@@ -27,69 +24,118 @@ Some basic notes:
 #include <pthread.h>
 #include <unistd.h>	//for usleep
 
-
 #include "util.h"
+#include "queue.h"
 
 #define MINARGS 3
 #define USAGE "<inputFilePath> <outputFilePath>"
 #define SBUFSIZE 1025
 #define INPUTFS "%1024s"
+#define RESOLVER_THREAD_COUNT 10
+
+// Global variables
+queue hostnameQueue;
+pthread_mutex_t queueLock;
+pthread_mutex_t fileLock;
+FILE* outputfp = NULL;		//Holds the output file
+int requestThreadsFinished = 0;
 
 
-
-
-void* handleFile(char* inputFileName)
+void* requestThreadFunction(char* inputFileName)
 {
 	// printf("%s\n", inputFileName);
 	char hostname[SBUFSIZE];	//Holds the individual hostname
 	char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
-
-	char someString[2048];
-	char tempString[2048];
+	char* payload;
 
 	FILE* inputFile = fopen(inputFileName, "r");
-	// printf("%s\n", inputFile);
+
+	// printf("Opening %s\n", inputFileName);
 
 	/* Read File and Process*/
-	// printf("Not in loop yet\n");
 	while(fscanf(inputFile, INPUTFS, hostname) > 0)
 	{
-		// sprintf(tempString, "%s\n", hostname);
-		// strcat(someString, tempString);
 	    /* Lookup hostname and get IP string */
-	    int dnsRC = dnslookup(hostname, firstipstr, sizeof(firstipstr));
-	    // printf("dnsRC = %i\n", dnsRC);
-	    if(dnsRC == UTIL_FAILURE)
-	    {
-			fprintf(stderr, "dnslookup error: %s\n", hostname);
-			strncpy(firstipstr, "", sizeof(firstipstr));
-	    }
-	
-	    /* Write to Output File */
-	    // fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
-	    // printf("SOMETHING ABOUT A LOOP\n");
-	    printf("%s,%s\n", hostname, firstipstr);
+		int queueSuccess = 0;
+		while(queueSuccess == 0) 
+		{
+			pthread_mutex_lock(&queueLock);
+			if(queue_is_full(&hostnameQueue))
+			{
+				pthread_mutex_unlock(&queueLock);
+				usleep( rand() % 100 );	//goes somewhere. Maybe not here.
+				// printf("Queue full! sleep!\n");
+			}
+			else
+			{
+				// printf("Hostname address = %p\n", hostname);
+				payload = malloc(SBUFSIZE);
+				payload=strncpy(payload, hostname, SBUFSIZE); 
+				queue_push(&hostnameQueue, payload);
+				pthread_mutex_unlock(&queueLock);
+				// printf("Success!\n");
+				queueSuccess = 1;
+			}
+		}
 	}
-	// printf("%s\n", someString);
 	/* Close Input File */
 	fclose(inputFile);
+	return NULL;
+}
+
+void* resolverThreadFunction()
+{
+	char* hostname;	//Should contain the hostname
+	char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
+
+	while(!queue_is_empty(&hostnameQueue) || !requestThreadsFinished)
+	{
+		pthread_mutex_lock(&queueLock);
+		if(!queue_is_empty(&hostnameQueue))
+		{
+			hostname = queue_pop(&hostnameQueue);
+			// printf("Removing %s from queue\n", hostname );
+
+
+			if(hostname != NULL)
+			{
+				pthread_mutex_unlock(&queueLock);
+
+				int dnsRC = dnslookup(hostname, firstipstr, sizeof(firstipstr));
+
+				if(dnsRC == UTIL_FAILURE)
+			    {
+					fprintf(stderr, "dnslookup error: %s\n", hostname);
+					strncpy(firstipstr, "", sizeof(firstipstr));
+			    }
+
+			    pthread_mutex_lock(&fileLock);
+				fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
+				pthread_mutex_unlock(&fileLock);
+			}
+			free(hostname);
+		}
+		else	//Queue is empty
+		{
+			pthread_mutex_unlock(&queueLock);
+		}
+	}
 }
 
 int main(int argc, char* argv[])
 {
 
+	int numFiles = argc - 2;
     /* Local Vars */
-    // FILE* inputfp = NULL;		//Holds the input file
-    FILE* outputfp = NULL;		//Holds the output file
+
+    pthread_mutex_init(&queueLock, NULL);
+    pthread_mutex_init( &fileLock, NULL);
+
+    queue_init(&hostnameQueue, 50);
     
-
-    // FILE* inputFiles[argc-1];
-
-    // char hostname[SBUFSIZE];	//Holds the individual hostname
-    // char errorstr[SBUFSIZE];	//Holds some error text
-    // char firstipsmtr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
-    int i;	//Index variable for iterating through argv
     pthread_t requestThreads[argc-1];
+    pthread_t resolverThreads[RESOLVER_THREAD_COUNT];
+
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -112,32 +158,58 @@ int main(int argc, char* argv[])
     }
 
     /* Loop Through Input Files */
-    for(i=1; i<(argc-1); i++)	//Allocate 1 thread for every iteration here
+    for(int i=1; i<(argc-1); i++)	//Allocate 1 thread for every iteration here
     {
-    	// printf("In main loop\n");
-		/* Open Input File */
-		// inputFiles[i-1] = fopen(argv[i], "r");
-		// if(!inputFiles[i-1])
-		// {
-		//     sprintf(errorstr, "Error Opening Input File: %s", argv[i]);
-		//     perror(errorstr);
-		//     // break;
-		// }	
 
-		int rc = pthread_create(&requestThreads[i-1], &attr, handleFile, argv[i]);
+		int rc = pthread_create(&requestThreads[i-1], &attr, requestThreadFunction, argv[i]);
+		if(rc)
+		{
+			printf("Request thread broke\n");
+		}
 		// printf("pthread_create return code = %i\n", rc );
-		
     }
-    usleep(5000000);	//Sleep for 5 seconds. I dont know why, but this fixed everything. No idea why join wasn't working...
 
-    for(int j = 1; j < argc-1; ++j)
+    for(int i = 0; i < RESOLVER_THREAD_COUNT; ++i)
     {
-    	int rc = pthread_join( requestThreads[i-1],  NULL);		//WHY DOES THIS RETURN 3???
-    	printf("Thread %i finished. rc = %i\n", j-1, rc);
+    	int rc = pthread_create(&resolverThreads[i], &attr, resolverThreadFunction, NULL);
+    	if(rc)
+    	{
+    		printf("Resolver thread broke\n");
+    	}
+    }
+
+    /* Join on the request threads */
+    for(int i = 0; i < numFiles; ++i)
+    {
+    	int rc = pthread_join( requestThreads[i],  NULL);
+
+    	if(rc)
+    	{
+    		printf("Request thread broke");
+    	}
+    }
+    requestThreadsFinished = 1;
+
+    /* Join on the resolver threads */
+    for(int i = 0; i < RESOLVER_THREAD_COUNT; ++i)
+    {
+    	int rc = pthread_join( resolverThreads[i], NULL);
+		if(rc)
+    	{
+    		printf("Resolver thread broke");
+    	}    
+    	else
+    	{
+    		// printf("Resolver thread #%i successfully joined\n", i );
+    	}
     }
 
     /* Close Output File */
     fclose(outputfp);
+
+    /* Destroy mutexes */
+    pthread_mutex_destroy(&queueLock);
+	pthread_mutex_destroy( &fileLock);
 
     return EXIT_SUCCESS;
 }
