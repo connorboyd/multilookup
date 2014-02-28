@@ -43,19 +43,13 @@ int requestThreadsFinished = 0;
 
 void* requestThreadFunction(void* inputFileName)
 {
-	// printf("%s\n", inputFileName);
 	char hostname[SBUFSIZE];	//Holds the individual hostname
-	// char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
 	char* payload;
-
 	FILE* inputFile = fopen(inputFileName, "r");
-
-	// printf("Opening %s\n", inputFileName);
 
 	/* Read File and Process*/
 	while(fscanf(inputFile, INPUTFS, hostname) > 0)
 	{
-	    /* Lookup hostname and get IP string */
 		int queueSuccess = 0;
 		while(queueSuccess == 0) 
 		{
@@ -63,17 +57,14 @@ void* requestThreadFunction(void* inputFileName)
 			if(queue_is_full(&hostnameQueue))
 			{
 				pthread_mutex_unlock(&queueLock);
-				usleep( rand() % 100 );	//goes somewhere. Maybe not here.
-				// printf("Queue full! sleep!\n");
+				usleep( rand() % 100 );
 			}
 			else
 			{
-				// printf("Hostname address = %p\n", hostname);
 				payload = malloc(SBUFSIZE);
 				payload=strncpy(payload, hostname, SBUFSIZE); 
 				queue_push(&hostnameQueue, payload);
 				pthread_mutex_unlock(&queueLock);
-				// printf("Success!\n");
 				queueSuccess = 1;
 			}
 		}
@@ -94,8 +85,6 @@ void* resolverThreadFunction()
 		if(!queue_is_empty(&hostnameQueue))
 		{
 			hostname = queue_pop(&hostnameQueue);
-			// printf("Removing %s from queue\n", hostname );
-
 
 			if(hostname != NULL)
 			{
@@ -119,6 +108,7 @@ void* resolverThreadFunction()
 			pthread_mutex_unlock(&queueLock);
 		}
 	}
+	return NULL;
 }
 
 int main(int argc, char* argv[])
@@ -165,9 +155,8 @@ int main(int argc, char* argv[])
 		{
 			printf("Request thread broke\n");
 		}
-		// printf("pthread_create return code = %i\n", rc );
     }
-
+    /* Create resolver threads */
     for(int i = 0; i < RESOLVER_THREAD_COUNT; ++i)
     {
     	int rc = pthread_create(&resolverThreads[i], &attr, resolverThreadFunction, NULL);
