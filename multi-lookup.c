@@ -41,11 +41,11 @@ FILE* outputfp = NULL;		//Holds the output file
 int requestThreadsFinished = 0;
 
 
-void* requestThreadFunction(char* inputFileName)
+void* requestThreadFunction(void* inputFileName)
 {
 	// printf("%s\n", inputFileName);
 	char hostname[SBUFSIZE];	//Holds the individual hostname
-	char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
+	// char firstipstr[INET6_ADDRSTRLEN]; //Holds the resolved IP address
 	char* payload;
 
 	FILE* inputFile = fopen(inputFileName, "r");
@@ -108,7 +108,6 @@ void* resolverThreadFunction()
 					fprintf(stderr, "dnslookup error: %s\n", hostname);
 					strncpy(firstipstr, "", sizeof(firstipstr));
 			    }
-
 			    pthread_mutex_lock(&fileLock);
 				fprintf(outputfp, "%s,%s\n", hostname, firstipstr);
 				pthread_mutex_unlock(&fileLock);
