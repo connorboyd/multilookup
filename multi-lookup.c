@@ -5,17 +5,7 @@
  * Create Date: 2014/02/25
  * Description:
  * 	This file contains threaded lookup program
- *  
  */
-/*
-Some basic notes:
-	Allocate one request thread for each input file
-	Request threads should add hostnames to the request queue
-		Maximum queue size is 50, so threads should sleep for 0-100 ms if the queue is full
-		Queue needs a mutex
-	Resolver thread should take a hostname from the queue, resolve the IP address, and write the results to results.txt
-		At least 2 resolver threads (Match to # of cores? More?)
-*/
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,7 +30,6 @@ pthread_mutex_t fileLock;
 FILE* outputfp = NULL;		//Holds the output file
 int requestThreadsFinished = 0;
 
-
 void* requestThreadFunction(void* inputFileName)
 {
 	char hostname[SBUFSIZE];	//Holds the individual hostname
@@ -62,7 +51,7 @@ void* requestThreadFunction(void* inputFileName)
 			else
 			{
 				payload = malloc(SBUFSIZE);
-				payload=strncpy(payload, hostname, SBUFSIZE); 
+				strncpy(payload, hostname, SBUFSIZE); 
 				queue_push(&hostnameQueue, payload);
 				pthread_mutex_unlock(&queueLock);
 				queueSuccess = 1;
@@ -113,7 +102,6 @@ void* resolverThreadFunction()
 
 int main(int argc, char* argv[])
 {
-
 	int numFiles = argc - 2;
     /* Local Vars */
 
@@ -149,13 +137,13 @@ int main(int argc, char* argv[])
     /* Loop Through Input Files */
     for(int i=1; i<(argc-1); i++)	//Allocate 1 thread for every iteration here
     {
-
 		int rc = pthread_create(&requestThreads[i-1], &attr, requestThreadFunction, argv[i]);
 		if(rc)
 		{
 			printf("Request thread broke\n");
 		}
     }
+
     /* Create resolver threads */
     for(int i = 0; i < RESOLVER_THREAD_COUNT; ++i)
     {
@@ -170,7 +158,6 @@ int main(int argc, char* argv[])
     for(int i = 0; i < numFiles; ++i)
     {
     	int rc = pthread_join( requestThreads[i],  NULL);
-
     	if(rc)
     	{
     		printf("Request thread broke");
@@ -186,20 +173,14 @@ int main(int argc, char* argv[])
     	{
     		printf("Resolver thread broke");
     	}    
-    	else
-    	{
-    		// printf("Resolver thread #%i successfully joined\n", i );
-    	}
     }
 
     /* Close Output File */
     fclose(outputfp);
-
+    queue_cleanup(&hostnameQueue);
     /* Destroy mutexes */
     pthread_mutex_destroy(&queueLock);
 	pthread_mutex_destroy( &fileLock);
 
     return EXIT_SUCCESS;
 }
-
-
